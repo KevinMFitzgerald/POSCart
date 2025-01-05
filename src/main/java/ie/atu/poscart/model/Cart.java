@@ -10,7 +10,6 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Cart {
 
     @Id
@@ -19,5 +18,6 @@ public class Cart {
 
     private String buyerUsername;
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
     private List<CartItem> items = new ArrayList<>();
 }

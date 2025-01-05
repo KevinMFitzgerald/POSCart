@@ -1,13 +1,14 @@
 package ie.atu.poscart.controller;
 
 
-import ie.atu.poscart.DTOs.CartDTO;
 import ie.atu.poscart.model.Cart;
 import ie.atu.poscart.service.CartService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -30,19 +31,18 @@ public class CartController {
     }
 
     @GetMapping("/{buyerUsername}")
-    public ResponseEntity<CartDTO> viewCart(@PathVariable String buyerUsername) {
-        CartDTO cart = cartService.getCart(buyerUsername);
+    public ResponseEntity<Cart> viewCart(@PathVariable String buyerUsername) {
+        Cart cart = cartService.getCart(buyerUsername);
         return ResponseEntity.ok(cart);
     }
 
     @PostMapping("/checkout")
-    public ResponseEntity<String> checkout(@RequestBody CheckoutRequest req) {
-        String result = cartService.checkout(req.getBuyerUsername());
-        if (result.contains("success")) {
-            return ResponseEntity.ok(result);
-        } else {
-            return ResponseEntity.badRequest().body(result);
+    public ResponseEntity<String> checkout(@RequestBody Map<String, String> payload) {
+        String buyerUsername = payload.get("buyerUsername");
+        if (buyerUsername == null) {
+            return ResponseEntity.badRequest().body("Missing buyerUsername");
         }
+        return ResponseEntity.ok(cartService.checkout(buyerUsername));
     }
 
     @Data
