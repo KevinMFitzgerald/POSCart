@@ -1,9 +1,12 @@
 package ie.atu.poscart.client;
 
 
-import lombok.Data;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import lombok.Data;
+
+import java.util.List;
 
 @FeignClient(name = "payment-service", url = "http://localhost:8081")
 public interface PaymentClient {
@@ -14,8 +17,13 @@ public interface PaymentClient {
     @Data
     class PurchaseRequest {
         private String buyerUsername;
-        private Long productId;
+        private List<ItemDto> items;
         private double totalCost;
-        private int quantity;
+
+        @Data
+        public static class ItemDto {
+            private Long productId;
+            private int quantity;
+        }
     }
 }

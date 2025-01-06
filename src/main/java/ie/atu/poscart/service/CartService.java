@@ -2,13 +2,18 @@ package ie.atu.poscart.service;
 
 import ie.atu.poscart.client.InventoryClient;
 import ie.atu.poscart.client.PaymentClient;
+import ie.atu.poscart.client.PaymentClient.PurchaseRequest;
+import ie.atu.poscart.client.PaymentClient.PurchaseRequest.ItemDto;
 import ie.atu.poscart.model.Cart;
 import ie.atu.poscart.model.CartItem;
 import ie.atu.poscart.repository.CartRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import feign.FeignException;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -55,7 +60,6 @@ public class CartService {
 
     @Transactional
     public String checkout(String buyerUsername) {
-        // Fetch the cart for the user
         Cart cart = cartRepo.findByBuyerUsername(buyerUsername)
                 .orElseThrow(() -> new RuntimeException("No cart found for user: " + buyerUsername));
 
@@ -64,45 +68,52 @@ public class CartService {
         }
 
         double totalCost = 0.0;
+        List<ItemDto> purchaseItems = new ArrayList<>();
 
-        // Loop through all items to calculate cost and check stock
         for (CartItem item : cart.getItems()) {
             InventoryClient.ProductDto productDto = inventoryClient.getProductById(item.getProductId());
 
-            if (productDto == null || productDto.getPrice() <= 0) {
-                throw new RuntimeException("Invalid product data for product ID: " + item.getProductId());
+            if (productDto.getQuantity() < item.getQuantity()) {
+                throw new RuntimeException("Not enough stock for product: " + productDto.getName());
             }
-
-            // Calculate total cost for all items in the cart
             totalCost += productDto.getPrice() * item.getQuantity();
 
-            // Check stock before processing
-            if (productDto.getQuantity() < item.getQuantity()) {
-                throw new RuntimeException("Not enough stock for product ID: " + item.getProductId());
+            // Prepare purchase items
+            ItemDto purchaseItem = new ItemDto();
+            purchaseItem.setProductId(item.getProductId());
+            purchaseItem.setQuantity(item.getQuantity());
+            purchaseItems.add(purchaseItem);
+        }
+
+        for (CartItem item : cart.getItems()) {
+            InventoryClient.DecrementRequest reserveRequest = new InventoryClient.DecrementRequest();
+            reserveRequest.setAmount(item.getQuantity());
+            String reserveResponse = inventoryClient.decrementStock(item.getProductId(), reserveRequest);
+
+            if (!reserveResponse.contains("Stock decremented")) {
+                throw new RuntimeException("Stock reservation failed for product ID: " + item.getProductId());
             }
         }
 
-        // Attempt payment through Payment Service
-        PaymentClient.PurchaseRequest paymentRequest = new PaymentClient.PurchaseRequest();
+        PurchaseRequest paymentRequest = new PurchaseRequest();
         paymentRequest.setBuyerUsername(buyerUsername);
+        paymentRequest.setItems(purchaseItems);
         paymentRequest.setTotalCost(totalCost);
 
-        String paymentResponse = paymentClient.purchase(paymentRequest);
+        String paymentResponse;
+        try {
+            paymentResponse = paymentClient.purchase(paymentRequest);
+        } catch (FeignException e) {
+            if (e.status() == 400) {
+                throw new RuntimeException("Payment failed: " + e.contentUTF8());
+            }
+            throw new RuntimeException("Payment service error: " + e.getMessage());
+        }
+
         if (!paymentResponse.startsWith("Purchase successful")) {
             throw new RuntimeException("Payment failed: " + paymentResponse);
         }
 
-        // If payment successful, decrement stock
-        for (CartItem item : cart.getItems()) {
-            if (item.getProductId() == null) {
-                throw new RuntimeException("Invalid Product ID: Cannot decrement stock.");
-            }
-            InventoryClient.DecrementRequest decrementRequest = new InventoryClient.DecrementRequest();
-            decrementRequest.setAmount(item.getQuantity());
-            inventoryClient.decrementStock(item.getProductId(), decrementRequest);
-        }
-
-        // Clear the cart after successful checkout
         cartRepo.delete(cart);
         return "Checkout successful! Total cost: " + totalCost;
     }
