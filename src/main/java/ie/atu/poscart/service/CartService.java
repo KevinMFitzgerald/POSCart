@@ -10,7 +10,6 @@ import ie.atu.poscart.repository.CartRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import feign.FeignException;
 
 import java.util.ArrayList;
 import java.util.List;
