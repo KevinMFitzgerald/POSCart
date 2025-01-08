@@ -3,7 +3,7 @@ package ie.atu.poscart.client;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
-import lombok.Data;
+import lombok.*;
 
 @FeignClient(name = "inventory-service", url = "http://localhost:8080")
 public interface InventoryClient {
@@ -18,7 +18,8 @@ public interface InventoryClient {
     class DecrementRequest {
         private int amount;
     }
-
+    @NoArgsConstructor
+    @AllArgsConstructor
     @Data
     class ProductDto {
         private Long id;
