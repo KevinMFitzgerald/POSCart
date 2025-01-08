@@ -78,21 +78,10 @@ public class CartService {
             }
             totalCost += productDto.getPrice() * item.getQuantity();
 
-            // Prepare purchase items
             ItemDto purchaseItem = new ItemDto();
             purchaseItem.setProductId(item.getProductId());
             purchaseItem.setQuantity(item.getQuantity());
             purchaseItems.add(purchaseItem);
-        }
-
-        for (CartItem item : cart.getItems()) {
-            InventoryClient.DecrementRequest reserveRequest = new InventoryClient.DecrementRequest();
-            reserveRequest.setAmount(item.getQuantity());
-            String reserveResponse = inventoryClient.decrementStock(item.getProductId(), reserveRequest);
-
-            if (!reserveResponse.contains("Stock decremented")) {
-                throw new RuntimeException("Stock reservation failed for product ID: " + item.getProductId());
-            }
         }
 
         PurchaseRequest paymentRequest = new PurchaseRequest();
@@ -100,15 +89,7 @@ public class CartService {
         paymentRequest.setItems(purchaseItems);
         paymentRequest.setTotalCost(totalCost);
 
-        String paymentResponse;
-        try {
-            paymentResponse = paymentClient.purchase(paymentRequest);
-        } catch (FeignException e) {
-            if (e.status() == 400) {
-                throw new RuntimeException("Payment failed: " + e.contentUTF8());
-            }
-            throw new RuntimeException("Payment service error: " + e.getMessage());
-        }
+        String paymentResponse = paymentClient.purchase(paymentRequest);
 
         if (!paymentResponse.startsWith("Purchase successful")) {
             throw new RuntimeException("Payment failed: " + paymentResponse);
