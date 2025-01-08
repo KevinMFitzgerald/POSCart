@@ -2,23 +2,23 @@ package ie.atu.poscart.service;
 
 import ie.atu.poscart.client.InventoryClient;
 import ie.atu.poscart.client.PaymentClient;
-import ie.atu.poscart.client.PaymentClient.PurchaseRequest;
-import ie.atu.poscart.client.PaymentClient.PurchaseRequest.ItemDto;
 import ie.atu.poscart.model.Cart;
 import ie.atu.poscart.model.CartItem;
 import ie.atu.poscart.repository.CartRepository;
-import lombok.RequiredArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ie.atu.poscart.client.PaymentClient.PurchaseRequest.ItemDto;
+import ie.atu.poscart.client.PaymentClient.PurchaseRequest;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
+@AllArgsConstructor  // Lombok to generate constructor with all dependencies injected
 public class CartService {
-
     private final CartRepository cartRepo;
     private final PaymentClient paymentClient;
     private final InventoryClient inventoryClient;
@@ -26,12 +26,16 @@ public class CartService {
     public Cart createOrFetchCart(String buyerUsername) {
         return cartRepo.findByBuyerUsername(buyerUsername)
                 .orElseGet(() -> {
-                    Cart cart = new Cart();
-                    cart.setBuyerUsername(buyerUsername);
-                    return cartRepo.save(cart);
+                    Cart newCart = new Cart();
+                    newCart.setBuyerUsername(buyerUsername);
+                    cartRepo.save(newCart);
+                    return newCart;
                 });
     }
 
+
+
+    @Transactional
     public Cart addItem(String buyerUsername, Long productId, int quantity) {
         Cart cart = createOrFetchCart(buyerUsername);
 
@@ -54,7 +58,11 @@ public class CartService {
 
     public Cart getCart(String buyerUsername) {
         return cartRepo.findByBuyerUsername(buyerUsername)
-                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + buyerUsername));
+                .orElseGet(() -> {
+                    Cart newCart = new Cart();
+                    newCart.setBuyerUsername(buyerUsername);
+                    return cartRepo.save(newCart);
+                });
     }
 
     @Transactional
@@ -97,4 +105,15 @@ public class CartService {
         cartRepo.delete(cart);
         return "Checkout successful! Total cost: " + totalCost;
     }
+
+    @Transactional
+    public Cart removeItem(String buyerUsername, Long productId) {
+        Cart cart = cartRepo.findByBuyerUsername(buyerUsername)
+                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + buyerUsername));
+
+        cart.getItems().removeIf(item -> item.getProductId().equals(productId));
+
+        return cartRepo.save(cart);
+    }
 }
+

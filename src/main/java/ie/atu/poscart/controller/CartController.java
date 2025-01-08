@@ -29,11 +29,24 @@ public class CartController {
         Cart cart = cartService.addItem(req.getBuyerUsername(), req.getProductId(), req.getQuantity());
         return ResponseEntity.ok(cart);
     }
+    @PostMapping("/item/remove")
+    public ResponseEntity<String> removeItem(@RequestBody AddItemRequest req) {
+        try {
+            cartService.removeItem(req.getBuyerUsername(), req.getProductId());
+            return ResponseEntity.ok("Item successfully removed from the cart!");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 
     @GetMapping("/{buyerUsername}")
-    public ResponseEntity<Cart> viewCart(@PathVariable String buyerUsername) {
-        Cart cart = cartService.getCart(buyerUsername);
-        return ResponseEntity.ok(cart);
+    public ResponseEntity<?> viewCart(@PathVariable String buyerUsername) {
+        try {
+            Cart cart = cartService.getCart(buyerUsername);
+            return ResponseEntity.ok(cart);
+        } catch (Exception e) {
+            return ResponseEntity.status(404).body("Cart not found for user: " + buyerUsername);
+        }
     }
 
     @PostMapping("/checkout")
